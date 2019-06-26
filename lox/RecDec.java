@@ -7,7 +7,9 @@ import static lox.TokenType.*;
 
 
 /*
-program        → statement* EOF ;
+program        → declaration* EOF;
+declaration    → varDecl | statement;
+varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 statement      → exprStatement | printStatemt ;
 exprStatement  → expression ";" ;
 printStatement -> "print" expression ";" ;
@@ -20,7 +22,7 @@ multiplication → unary ( ( "/" | "*" ) unary )* ;
 unary          → ( "!" | "-" ) unary
 | primary ;
 primary        → NUMBER | STRING | "false" | "true" | "nil"
-| "(" expression ")" ;
+| "(" expression ")" | IDENTIFIER ;
 
 1 > 2 ? 0 : 1
 1 > 2 ? 1 ? -1 : 0
@@ -38,10 +40,14 @@ class Parser {
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
 
-        while(!isAtEnd()) {
-            statements.add(statement());
+        try {
+            while (!isAtEnd()) {
+                statements.add(statement());
+            }
+            return statements;
+        } catch {
+
         }
-        return statements;
 
     }
 
