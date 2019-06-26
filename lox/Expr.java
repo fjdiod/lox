@@ -9,6 +9,7 @@ R visitUnaryExpr(Unary expr);
 R visitLiteralExpr(Literal expr);
 R visitTernaryExpr(Ternary expr);
 R visitVariableExpr(Variable expr);
+R visitAssignExpr(Assign expr);
 R visitGroupingExpr(Grouping expr);
 
 }
@@ -93,6 +94,23 @@ return visitor.visitVariableExpr(this);
 }
 
 final Token name;
+
+
+}
+
+static class Assign extends Expr {
+Assign(Token name, Expr value) {
+this.name = name;
+this.value = value;
+
+}
+
+<R> R accept(Visitor<R> visitor) {
+return visitor.visitAssignExpr(this);
+}
+
+final Token name;
+final Expr value;
 
 
 }

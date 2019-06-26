@@ -7,6 +7,7 @@ interface Visitor<R> {
 R visitPrintStmt(Print stmt);
 R visitVarStmt(Var stmt);
 R visitExpressionStmt(Expression stmt);
+R visitBlockStmt(Block stmt);
 
 }
 static class Print extends Stmt {
@@ -42,8 +43,9 @@ final Expr initializer;
 }
 
 static class Expression extends Stmt {
-Expression(Expr expression) {
+Expression(Expr expression, boolean print) {
 this.expression = expression;
+this.print = print;
 
 }
 
@@ -52,6 +54,22 @@ return visitor.visitExpressionStmt(this);
 }
 
 final Expr expression;
+final boolean print;
+
+
+}
+
+static class Block extends Stmt {
+Block(List<Stmt> statements) {
+this.statements = statements;
+
+}
+
+<R> R accept(Visitor<R> visitor) {
+return visitor.visitBlockStmt(this);
+}
+
+final List<Stmt> statements;
 
 
 }

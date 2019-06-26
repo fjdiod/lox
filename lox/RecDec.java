@@ -10,9 +10,12 @@ import static lox.TokenType.*;
 program        → declaration* EOF;
 declaration    → varDecl | statement;
 varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-statement      → exprStatement | printStatemt ;
+statement      → exprStatement | printStatemt | block;
+block          → "{" declaration "}"
 exprStatement  → expression ";" ;
-printStatement -> "print" expression ";" ;
+printStatement → "print" expression ";" ;
+expression     → assignment ("," assignment)*;
+assignment     → IDENTIFIER "=" assignment | equality;
 expression     → equality ("," equality)* ;
 equality       → tern ( ( "!=" | "==" ) tern )* ;
 tern           → comparison "?" comparison ":" tern
@@ -40,14 +43,11 @@ class Parser {
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
 
-        try {
-            while (!isAtEnd()) {
-                statements.add(statement());
-            }
-            return statements;
-        } catch {
 
+        while (!isAtEnd()) {
+            statements.add(declaration());
         }
+        return statements;
 
     }
 
@@ -55,25 +55,52 @@ class Parser {
         this.tokens = tokens;
     }
 
-    private void program() {
-        while (peek().type != EOF) {
-             statement();
+    private Stmt declaration() {
+        try {
+            if (match(VAR)) {
+                return varDecl();
+            }
+            return statement();
+        } catch (ParseError error) {
+            synchronize();
+            return null;
         }
+    }
+
+    private Stmt varDecl() {
+        Token name = consume(IDENTIFIER, "Expect variable name.");
+        Expr initializer = null;
+        if (match(EQUAL)) {
+            initializer = expression();
+        }
+        consume(SEMICOLON, "Expect ;.");
+        return new Stmt.Var(name, initializer);
     }
 
     private Stmt statement() {
         if (match(PRINT)) {
             return printStatement();
         }
+        if (match(LEFT_BRACE)) return new Stmt.Block(block());
         return expressionStatement();
         //consume(SEMICOLON, "Expect ';' after stetements.");
     }
 
+    private List<Stmt> block() {
+        List<Stmt> statements = new ArrayList<>();
+        while(!check(RIGHT_BRACE) && !isAtEnd()) {
+            statements.add(declaration());
+        }
+        consume(RIGHT_BRACE, "expected }");
+        return statements;
+    }
+
     private Stmt expressionStatement() {
         Expr expr = expression();
+        //consume(SEMICOLON, "Expect ';' after stetements.");
+        if(peek().type == EOF) return new Stmt.Expression(expr, true);
         consume(SEMICOLON, "Expect ';' after stetements.");
-        return new Stmt.Expression(expr);
-        //System.out.println(expr)
+        return new Stmt.Expression(expr, false);
     }
 
     private Stmt printStatement() {
@@ -84,10 +111,24 @@ class Parser {
     }
 
     private Expr expression() {
-        Expr expr = equality();
+        Expr expr = assignment();
         while (match(COMMA)) {
             Token comma = previous();
-            expr = equality();
+            expr = assignment();
+        }
+        return expr;
+    }
+
+    private Expr assignment() {
+        Expr expr = equality();
+        if (match(EQUAL)) {
+            Token equals = previous();
+            Expr value = assignment();
+            if (expr instanceof Expr.Variable) {
+                Token name = ((Expr.Variable)expr).name;
+                return new Expr.Assign(name, value);
+            }
+            error(equals, "Invalid assignment target.");
         }
         return expr;
     }
@@ -164,6 +205,10 @@ class Parser {
 
         if (match(NUMBER, STRING)) {
             return new Expr.Literal(previous().literal);
+        }
+
+        if (match(IDENTIFIER)) {
+            return new Expr.Variable(previous());
         }
 
         if (match(LEFT_PAREN)) {
