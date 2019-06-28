@@ -4,9 +4,12 @@ import java.util.List;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     private Environment environment = new Environment();
+    static boolean shouldBreak, shouldContinue;
 
     void interpret(List<Stmt> statements) {
         try {
+            this.shouldBreak = false;
+            this.shouldContinue = false;
             for (Stmt statement : statements) {
                 execute(statement);
             }
@@ -24,6 +27,39 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     public Void visitExpressionStmt(Stmt.Expression stmt) {
         Object res = evaluate(stmt.expression);
         if (stmt.print) System.out.println(stringify(res));
+        return null;
+    }
+
+    @Override
+    public Void visitIfStmt(Stmt.If stmt) {
+        Object condition = evaluate(stmt.condition);
+        if (isBool(condition)) execute(stmt.thenBranch);
+        else if (stmt.elseBranch != null){
+            execute(stmt.elseBranch);
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitWhileStmt(Stmt.While stmt) {
+        while (isBool(evaluate(stmt.condition))) {
+            if (this.shouldBreak) {
+                this.shouldBreak = false;
+                break;
+            }
+            if (this.shouldContinue) {
+                this.shouldContinue = false;
+                continue;
+            }
+            execute(stmt.body);
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitJumpStmt(Stmt.Jump stmt) {
+        if (stmt.jump.type == TokenType.BREAK) this.shouldBreak = true;
+        if (stmt.jump.type == TokenType.CONTINUE) this.shouldContinue = true;
         return null;
     }
 
@@ -87,6 +123,18 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         if (object == null) return false;
         if (object instanceof Boolean) return (boolean)object;
         return true;
+    }
+
+    @Override
+    public Object visitLogicalExpr(Expr.Logical expr) {
+        Object left = evaluate(expr.left);
+        Object right = evaluate(expr.right);
+        if (expr.operator.type == TokenType.OR) {
+            if (isBool(left)) return left;
+        } else {
+            if (!isBool(left)) return left;
+        }
+        return right;
     }
 
     @Override

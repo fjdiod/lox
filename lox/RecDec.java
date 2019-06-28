@@ -10,13 +10,17 @@ import static lox.TokenType.*;
 program        → declaration* EOF;
 declaration    → varDecl | statement;
 varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-statement      → exprStatement | printStatemt | block;
+statement      → exprStatement | printStatemt | block | ifStatement | whileStatement | jumpStatement;
+jumpStatement  → "break" | "continue";
+whileStatement → "while" "(" expression ")" statement ;
+ifStatement    → "if" "(" expression ")" statement ("elif" "(" expression ")" statement)* ("else" statement)? ;
 block          → "{" declaration "}"
 exprStatement  → expression ";" ;
 printStatement → "print" expression ";" ;
 expression     → assignment ("," assignment)*;
-assignment     → IDENTIFIER "=" assignment | equality;
-expression     → equality ("," equality)* ;
+assignment     → IDENTIFIER "=" assignment | logic_or;
+logic_or       → logic_and ("or" logic_and)* ;
+logic_and      → equality ("and" equality)* ;
 equality       → tern ( ( "!=" | "==" ) tern )* ;
 tern           → comparison "?" comparison ":" tern
 comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
@@ -45,7 +49,7 @@ class Parser {
 
 
         while (!isAtEnd()) {
-            statements.add(declaration());
+            statements.add(declaration(null));
         }
         return statements;
 
@@ -55,12 +59,12 @@ class Parser {
         this.tokens = tokens;
     }
 
-    private Stmt declaration() {
+    private Stmt declaration(Stmt parent) {
         try {
             if (match(VAR)) {
                 return varDecl();
             }
-            return statement();
+            return statement(parent);
         } catch (ParseError error) {
             synchronize();
             return null;
@@ -77,13 +81,51 @@ class Parser {
         return new Stmt.Var(name, initializer);
     }
 
-    private Stmt statement() {
+    private Stmt statement(Stmt parent) {
         if (match(PRINT)) {
             return printStatement();
         }
-        if (match(LEFT_BRACE)) return new Stmt.Block(block());
+        if (match(IF)) {
+            return ifStatement();
+        }
+        if (match(WHILE)) {
+            return whileStatement();
+        }
+        if (match(LEFT_BRACE)) {
+            return new Stmt.Block(block());
+        }
         return expressionStatement();
         //consume(SEMICOLON, "Expect ';' after stetements.");
+    }
+
+    private Stmt climbJump(Stmt parent) {
+        if (parent instanceof Stmt.While) {
+            return parent;
+        }
+        if (parent == null) {
+            return null;
+        }
+        return climbJump(parent.parent);
+    }
+
+    private Stmt whileStatement(Stmt parent) {
+        Stmt.While whileStmt = new Stmt.While(null, null);
+        consume(LEFT_PAREN, "Expect '(' after 'while'.");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "excpected )");
+        return new Stmt.While(condition, statement());
+    }
+
+    private Stmt ifStatement() {
+        Stmt elseBranch = null;
+        consume(LEFT_PAREN, "Expect '(' after 'if'.");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect '(' after 'if'.");
+        Stmt thenBranch = statement();
+        if (match(ELSE)) {
+            elseBranch = statement();
+        }
+        return new Stmt.If(condition, thenBranch, elseBranch);
     }
 
     private List<Stmt> block() {
@@ -120,7 +162,7 @@ class Parser {
     }
 
     private Expr assignment() {
-        Expr expr = equality();
+        Expr expr = logicOr();
         if (match(EQUAL)) {
             Token equals = previous();
             Expr value = assignment();
@@ -129,6 +171,26 @@ class Parser {
                 return new Expr.Assign(name, value);
             }
             error(equals, "Invalid assignment target.");
+        }
+        return expr;
+    }
+
+    private Expr logicOr() {
+        Expr expr = logicAnd();
+        while (match(OR)) {
+            Token operator = previous();
+            Expr right = equality();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+        return expr;
+    }
+
+    private Expr logicAnd() {
+        Expr expr = equality();
+        while (match(AND)) {
+            Token operator = previous();
+            Expr right = equality();
+            expr = new Expr.Logical(expr, operator, right);
         }
         return expr;
     }

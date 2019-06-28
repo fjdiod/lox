@@ -20,6 +20,7 @@ class Scanner {
         keywords.put("and",    AND);
         keywords.put("class",  CLASS);
         keywords.put("else",   ELSE);
+        keywords.put("elif",   ELIF);
         keywords.put("false",  FALSE);
         keywords.put("for",    FOR);
         keywords.put("fun",    FUN);
@@ -33,6 +34,8 @@ class Scanner {
         keywords.put("true",   TRUE);
         keywords.put("var",    VAR);
         keywords.put("while",  WHILE);
+        keywords.put("break",  BREAK);
+        keywords.put("continue",  CONTINUE);
     }
     Scanner(String source) {
         this.source = source;
