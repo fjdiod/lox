@@ -19,7 +19,8 @@ block          → "{" declaration "}"
 exprStatement  → expression ";" ;
 printStatement → "print" expression ";" ;
 expression     → assignment ("," assignment)*;
-assignment     → IDENTIFIER "=" assignment | logic_or;
+assignment     → IDENTIFIER "=" assignment | IDENTIFIER assignOp expression | logic_or;
+assignOp       → "+=" | "-=" | "*=" | "/=" ;
 logic_or       → logic_and ("or" logic_and)* ;
 logic_and      → equality ("and" equality)* ;
 equality       → tern ( ( "!=" | "==" ) tern )* ;
@@ -217,6 +218,27 @@ class Parser {
                 return new Expr.Assign(name, value);
             }
             error(equals, "Invalid assignment target.");
+        }
+        //shugar
+        if (match(PLUS_EQUAL, MINUS_EQUAL, STAR_EQUAL, SLASH_EQUAL)) {
+            Token operator = previous();
+            Expr value = expression();
+            System.out.println(operator);
+            String op = Character.toString(operator.lexeme.charAt(0));
+            if (expr instanceof Expr.Variable) {
+                Token name = ((Expr.Variable)expr).name;
+                Token oper = null;
+                switch (op) {
+                    case "+": oper = new Token(PLUS, op, null, name.line); break;
+                    case "-": oper = new Token(MINUS, op, null, name.line); break;
+                    case "*": oper = new Token(STAR, op, null, name.line); break;
+                    case "/": oper = new Token(SLASH, op, null, name.line); break;
+                    default: error(name, "unrecohnized operation");
+                }
+                Expr.Binary sum = new Expr.Binary(expr, oper, value);
+                return new Expr.Assign(name, sum);
+            }
+
         }
         return expr;
     }

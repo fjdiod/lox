@@ -59,9 +59,9 @@ class Scanner {
             case '}': addToken(RIGHT_BRACE); break;
             case ',': addToken(COMMA); break;
             case '.': addToken(DOT); break;
-            case '*': addToken(STAR); break;
-            case '+': addToken(PLUS); break;
-            case '-': addToken(MINUS); break;
+            case '*': addToken(match('=') ? STAR_EQUAL : STAR); break;
+            case '+': addToken(match('=') ? PLUS_EQUAL : PLUS); break;
+            case '-': addToken(match('=') ? MINUS_EQUAL : MINUS); break;
             case ';': addToken(SEMICOLON); break;
             case '?': addToken(QUESTION); break;
             case ':': addToken(COLON); break;
@@ -82,7 +82,7 @@ class Scanner {
                     advance();
                 }
                 else {
-                    addToken(SLASH);
+                    addToken(match('=') ? SLASH_EQUAL : SLASH);
                 }
                 break;
             case ' ':
