@@ -46,13 +46,14 @@ class Parser {
     private static class ParseError extends RuntimeException {}
     private final List<Token> tokens;
     private int current = 0;
+    boolean isInloop = false;
 
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
 
 
         while (!isAtEnd()) {
-            statements.add(declaration(null));
+            statements.add(declaration());
         }
         return statements;
 
@@ -62,12 +63,12 @@ class Parser {
         this.tokens = tokens;
     }
 
-    private Stmt declaration(Stmt parent) {
+    private Stmt declaration() {
         try {
             if (match(VAR)) {
                 return varDecl();
             }
-            return statement(parent);
+            return statement();
         } catch (ParseError error) {
             synchronize();
             return null;
@@ -84,44 +85,41 @@ class Parser {
         return new Stmt.Var(name, initializer);
     }
 
-    private Stmt statement(Stmt parent) {
+    private Stmt statement() {
         if (match(FOR)) {
-            return forStatement(parent);
+            this.isInloop = true;
+            Stmt res = forStatement();
+            this.isInloop = false;
+            return res;
         }
         if (match(PRINT)) {
-            return printStatement(parent);
+            return printStatement();
         }
         if (match(IF)) {
-            return ifStatement(parent);
+            return ifStatement();
         }
         if (match(WHILE)) {
-            return whileStatement(parent);
+            this.isInloop = true;
+            Stmt res = whileStatement();
+            this.isInloop = false;
+            return res;
         }
         if (match(BREAK, CONTINUE)) {
-            if (parent == null) throw error(previous(), "'break' without loop");
+            if (!this.isInloop) throw error(previous(), "'break' without loop");
             //System.out.println(parent);
-            Stmt.Jump jump = new Stmt.Jump(previous(), parent);
+            Stmt.Jump jump = new Stmt.Jump(previous());
             consume(SEMICOLON, "expected ';'");
             return jump;
         }
         if (match(LEFT_BRACE)) {
-            return new Stmt.Block(block(parent));
+            return new Stmt.Block(block());
         }
-        return expressionStatement(parent);
+        return expressionStatement();
         //consume(SEMICOLON, "Expect ';' after stetements.");
     }
 
-    private Stmt climbJump(Stmt parent) {
-        if (parent instanceof Stmt.While) {
-            return parent;
-        }
-        if (parent == null) {
-            return null;
-        }
-        return climbJump(parent.parent);
-    }
 
-    private Stmt forStatement(Stmt parent) {
+    private Stmt forStatement() {
         consume(LEFT_PAREN, "Expect '(' after 'while'.");
         Stmt initializer;
         if (match(SEMICOLON)) {
@@ -129,7 +127,7 @@ class Parser {
         } else if (match(VAR)) {
             initializer = varDecl();
         } else {
-            initializer = expressionStatement(parent);
+            initializer = expressionStatement();
         }
         Expr condition = null;
         if (!check(SEMICOLON)) {
@@ -142,8 +140,7 @@ class Parser {
             increment = expression();
         }
         consume(RIGHT_PAREN, "Expect ')' after for clauses.");
-        Stmt.While whileStmt = new Stmt.While(null, null);
-        Stmt body = statement(whileStmt);
+        Stmt body = statement();
         if (increment != null) {
             body = new Stmt.Block(Arrays.asList(
                     body,
@@ -157,43 +154,36 @@ class Parser {
         return body;
     }
 
-    private Stmt whileStatement(Stmt parent) {
-        Stmt.While whileStmt = new Stmt.While(null, null);
-        whileStmt.parent = parent;
+    private Stmt whileStatement() {
         consume(LEFT_PAREN, "Expect '(' after 'while'.");
         Expr condition = expression();
         consume(RIGHT_PAREN, "excpected )");
-        Stmt body = statement(whileStmt);
-        whileStmt.condition = condition;
-        whileStmt.body = body;
-        return whileStmt;
+        Stmt body = statement();
+        return new Stmt.While(condition, body);
     }
 
-    private Stmt ifStatement(Stmt parent) {
+    private Stmt ifStatement() {
         Stmt elseBranch = null;
-        //System.out.println("========IF========");
-        //System.out.println(parent);
-        //System.out.println("==================");
         consume(LEFT_PAREN, "Expect '(' after 'if'.");
         Expr condition = expression();
         consume(RIGHT_PAREN, "Expect '(' after 'if'.");
-        Stmt thenBranch = statement(parent);
+        Stmt thenBranch = statement();
         if (match(ELSE)) {
-            elseBranch = statement(parent);
+            elseBranch = statement();
         }
         return new Stmt.If(condition, thenBranch, elseBranch);
     }
 
-    private List<Stmt> block(Stmt parent) {
+    private List<Stmt> block() {
         List<Stmt> statements = new ArrayList<>();
         while(!check(RIGHT_BRACE) && !isAtEnd()) {
-            statements.add(declaration(parent));
+            statements.add(declaration());
         }
         consume(RIGHT_BRACE, "expected }");
         return statements;
     }
 
-    private Stmt expressionStatement(Stmt parent) {
+    private Stmt expressionStatement() {
         Expr expr = expression();
         //consume(SEMICOLON, "Expect ';' after stetements.");
         if(peek().type == EOF) return new Stmt.Expression(expr, true);
@@ -201,7 +191,7 @@ class Parser {
         return new Stmt.Expression(expr, false);
     }
 
-    private Stmt printStatement(Stmt parent) {
+    private Stmt printStatement() {
         Expr expr = expression();
         consume(SEMICOLON, "Expect ';' after stetements.");
         return new Stmt.Print(expr);
