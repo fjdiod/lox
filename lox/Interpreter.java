@@ -1,10 +1,29 @@
 package lox;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
-    private Environment environment = new Environment();
+    final Environment globals = new Environment();
+    private Environment environment = globals;
     static boolean shouldBreak, shouldContinue;
+
+    Interpreter() {
+        globals.define("time", new LoxCallable() {
+            @Override
+            public int arity() { return 0; }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                return (double)System.currentTimeMillis() / 1000.0;
+            }
+
+            @Override
+            public String toString() { return "<native fn>"; }
+        });
+
+    }
 
     void interpret(List<Stmt> statements) {
         try {
@@ -100,6 +119,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
+    public Void visitFunctionStmt(Stmt.Function stmt) {
+        LoxFunction fun = new LoxFunction(stmt);
+        environment.define(stmt.name.lexeme, fun);
+        return null;
+    }
+
+    @Override
     public Object visitGroupingExpr(Expr.Grouping expr) {
         return evaluate(expr.expression);
     }
@@ -136,6 +162,27 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
             if (!isBool(left)) return left;
         }
         return right;
+    }
+
+    @Override
+    public Object visitCallExpr(Expr.Call expr) {
+        Object callee = evaluate(expr.callee);
+        List<Object> args = new ArrayList<>();
+
+        for (Expr arg : expr.args) {
+            args.add(evaluate(arg));
+        }
+        if (! (callee instanceof LoxCallable)) {
+            throw new RuntimeError(expr.paren,
+                    "Can only call functions and classes.");
+        }
+        LoxCallable fun = (LoxCallable)callee;
+        if (args.size() != fun.arity()) {
+            throw new RuntimeError(expr.paren, "Expected " +
+                    fun.arity() + " arguments but got " +
+                    args.size() + ".");
+        }
+        return fun.call(this, args);
     }
 
     @Override
@@ -210,7 +257,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         if (!this.shouldBreak && !this.shouldContinue) stmt.accept(this);
     }
 
-    private void executeBlock(List<Stmt> statements, Environment env) {
+    public void executeBlock(List<Stmt> statements, Environment env) {
         Environment previous = this.environment;
         try {
             this.environment = env;

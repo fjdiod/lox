@@ -9,8 +9,8 @@ import static lox.TokenType.*;
 
 /*
 program        → declaration* EOF;
-declaration    → varDecl | statement;
-varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+declaration    → funDec | varDecl | statement;
+varDecl        → "var" IDENTIFIER ( "=" expression | "=" "fun" block)? ";";
 statement      → exprStatement | printStatemt | block | ifStatement | whileStatement | jumpStatement;
 jumpStatement  → "break" | "continue";
 whileStatement → "while" "(" expression ")" statement ;
@@ -80,6 +80,20 @@ class Parser {
         Token name = consume(IDENTIFIER, "Expect variable name.");
         Expr initializer = null;
         if (match(EQUAL)) {
+            if (match(FUN)) {
+                consume(LEFT_PAREN, "'(' expected after 'fun'");
+                List<Token> args = new ArrayList<>();
+                if (!check(RIGHT_PAREN)) {
+                    do {
+                        args.add(consume(IDENTIFIER, "excpected identifier"));
+                    } while(match(COMMA));
+                }
+                consume(RIGHT_PAREN, "')' expected after 'fun'");
+                consume(LEFT_BRACE, "'{' expected after 'fun'");
+                List<Stmt> body = block();
+                consume(SEMICOLON, "expected ';' after declaration of function");
+                return new Stmt.Function(name, args, body);
+            }
             initializer = expression();
         }
         consume(SEMICOLON, "Expect ;.");
@@ -325,7 +339,29 @@ class Parser {
             Expr right = unary();
             return new Expr.Unary(operator, right);
         }
-        return primary();
+        return call();
+    }
+
+    //call      → primary ( "(" arguments ? ")")* ;
+    //arguments → expression ( "," expression )* ;
+    private Expr call() {
+        Expr expr = primary();
+        while (match(LEFT_PAREN)) {
+            expr = finishCall(expr);
+
+        }
+        return expr;
+    }
+
+    private Expr finishCall(Expr expr) {
+        List<Expr> args = new ArrayList<>();
+        if (!check(RIGHT_PAREN)) {
+            do {
+                args.add(assignment());
+            } while(match(COMMA));
+        }
+        Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
+        return new Expr.Call(expr, paren, args);
     }
 
     private Expr primary() {

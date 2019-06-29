@@ -12,7 +12,7 @@ R visitVariableExpr(Variable expr);
 R visitAssignExpr(Assign expr);
 R visitLogicalExpr(Logical expr);
 R visitGroupingExpr(Grouping expr);
-
+R visitCallExpr(Call expr);
 }
 static class Unary extends Expr {
 Unary(Token operator, Expr right) {
@@ -49,6 +49,25 @@ final Expr right;
 
 
 }
+
+    static class Call extends Expr {
+        Call(Expr callee, Token paren, List<Expr> args) {
+            this.callee = callee;
+            this.paren = paren;
+            this.args = args;
+
+        }
+
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitCallExpr(this);
+        }
+
+        final Expr callee;
+        final Token paren;
+        final List<Expr> args;
+
+
+    }
 
 static class Literal extends Expr {
 Literal(Object value) {
