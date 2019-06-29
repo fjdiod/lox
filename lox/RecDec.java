@@ -27,7 +27,9 @@ tern           → comparison "?" comparison ":" tern
 comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
 addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
 multiplication → unary ( ( "/" | "*" ) unary )* ;
-unary          → ( "!" | "-" ) unary
+unary          → ( "!" | "-" ) unary | call ;
+call           → primary ( "(" arguments ? ")")* ;
+arguments      → expression ( "," expression )* ;
 | primary ;
 primary        → NUMBER | STRING | "false" | "true" | "nil"
 | "(" expression ")" | IDENTIFIER ;
