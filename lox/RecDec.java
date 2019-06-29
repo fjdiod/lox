@@ -66,6 +66,9 @@ class Parser {
 
     private Stmt declaration() {
         try {
+            if (match(FUN)) {
+                return funDec("function");
+            }
             if (match(VAR)) {
                 return varDecl();
             }
@@ -74,6 +77,22 @@ class Parser {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt funDec(String kind) {
+        Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+        consume(LEFT_PAREN, "'(' expected after 'fun'");
+        List<Token> args = new ArrayList<>();
+        if (!check(RIGHT_PAREN)) {
+            do {
+                args.add(consume(IDENTIFIER, "excpected identifier"));
+            } while(match(COMMA));
+        }
+        consume(RIGHT_PAREN, "')' expected after 'fun'");
+        consume(LEFT_BRACE, "'{' expected after 'fun'");
+        List<Stmt> body = block();
+        consume(SEMICOLON, "expected ';' after declaration of function");
+        return new Stmt.Function(name, args, body);
     }
 
     private Stmt varDecl() {
