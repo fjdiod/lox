@@ -43,16 +43,17 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     @Override
     public Void visitWhileStmt(Stmt.While stmt) {
         while (isBool(evaluate(stmt.condition))) {
+            execute(stmt.body);
             if (this.shouldBreak) {
-                this.shouldBreak = false;
                 break;
             }
             if (this.shouldContinue) {
                 this.shouldContinue = false;
                 continue;
             }
-            execute(stmt.body);
         }
+        this.shouldBreak = false;
+        this.shouldContinue = false;
         return null;
     }
 
@@ -206,7 +207,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     private void execute(Stmt stmt) {
-        stmt.accept(this);
+        if (!this.shouldBreak && !this.shouldContinue) stmt.accept(this);
     }
 
     private void executeBlock(List<Stmt> statements, Environment env) {
@@ -214,6 +215,8 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         try {
             this.environment = env;
             for (Stmt stmt : statements) {
+
+                if (this.shouldBreak || this.shouldContinue) break;
                 stmt.accept(this);
             }
         } finally {

@@ -2,6 +2,7 @@ package lox;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import static lox.TokenType.*;
 
@@ -82,19 +83,29 @@ class Parser {
     }
 
     private Stmt statement(Stmt parent) {
+        if (match(FOR)) {
+            return forStatement(parent);
+        }
         if (match(PRINT)) {
-            return printStatement();
+            return printStatement(parent);
         }
         if (match(IF)) {
-            return ifStatement();
+            return ifStatement(parent);
         }
         if (match(WHILE)) {
-            return whileStatement();
+            return whileStatement(parent);
+        }
+        if (match(BREAK, CONTINUE)) {
+            if (parent == null) throw error(previous(), "'break' without loop");
+            //System.out.println(parent);
+            Stmt.Jump jump = new Stmt.Jump(previous(), parent);
+            consume(SEMICOLON, "expected ';'");
+            return jump;
         }
         if (match(LEFT_BRACE)) {
-            return new Stmt.Block(block());
+            return new Stmt.Block(block(parent));
         }
-        return expressionStatement();
+        return expressionStatement(parent);
         //consume(SEMICOLON, "Expect ';' after stetements.");
     }
 
@@ -108,36 +119,79 @@ class Parser {
         return climbJump(parent.parent);
     }
 
+    private Stmt forStatement(Stmt parent) {
+        consume(LEFT_PAREN, "Expect '(' after 'while'.");
+        Stmt initializer;
+        if (match(SEMICOLON)) {
+            initializer = null;
+        } else if (match(VAR)) {
+            initializer = varDecl();
+        } else {
+            initializer = expressionStatement(parent);
+        }
+        Expr condition = null;
+        if (!check(SEMICOLON)) {
+            condition = expression();
+        }
+        consume(SEMICOLON, "Expect ';' after loop condition.");
+
+        Expr increment = null;
+        if (!check(RIGHT_PAREN)) {
+            increment = expression();
+        }
+        consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+        Stmt.While whileStmt = new Stmt.While(null, null);
+        Stmt body = statement(whileStmt);
+        if (increment != null) {
+            body = new Stmt.Block(Arrays.asList(
+                    body,
+                    new Stmt.Expression(increment, false)));
+        }
+        if (condition == null) condition = new Expr.Literal(true);
+        body = new Stmt.While(condition, body);
+        if (initializer != null) {
+            body = new Stmt.Block(Arrays.asList(initializer, body));
+        }
+        return body;
+    }
+
     private Stmt whileStatement(Stmt parent) {
         Stmt.While whileStmt = new Stmt.While(null, null);
+        whileStmt.parent = parent;
         consume(LEFT_PAREN, "Expect '(' after 'while'.");
         Expr condition = expression();
         consume(RIGHT_PAREN, "excpected )");
-        return new Stmt.While(condition, statement());
+        Stmt body = statement(whileStmt);
+        whileStmt.condition = condition;
+        whileStmt.body = body;
+        return whileStmt;
     }
 
-    private Stmt ifStatement() {
+    private Stmt ifStatement(Stmt parent) {
         Stmt elseBranch = null;
+        //System.out.println("========IF========");
+        //System.out.println(parent);
+        //System.out.println("==================");
         consume(LEFT_PAREN, "Expect '(' after 'if'.");
         Expr condition = expression();
         consume(RIGHT_PAREN, "Expect '(' after 'if'.");
-        Stmt thenBranch = statement();
+        Stmt thenBranch = statement(parent);
         if (match(ELSE)) {
-            elseBranch = statement();
+            elseBranch = statement(parent);
         }
         return new Stmt.If(condition, thenBranch, elseBranch);
     }
 
-    private List<Stmt> block() {
+    private List<Stmt> block(Stmt parent) {
         List<Stmt> statements = new ArrayList<>();
         while(!check(RIGHT_BRACE) && !isAtEnd()) {
-            statements.add(declaration());
+            statements.add(declaration(parent));
         }
         consume(RIGHT_BRACE, "expected }");
         return statements;
     }
 
-    private Stmt expressionStatement() {
+    private Stmt expressionStatement(Stmt parent) {
         Expr expr = expression();
         //consume(SEMICOLON, "Expect ';' after stetements.");
         if(peek().type == EOF) return new Stmt.Expression(expr, true);
@@ -145,7 +199,7 @@ class Parser {
         return new Stmt.Expression(expr, false);
     }
 
-    private Stmt printStatement() {
+    private Stmt printStatement(Stmt parent) {
         Expr expr = expression();
         consume(SEMICOLON, "Expect ';' after stetements.");
         return new Stmt.Print(expr);
