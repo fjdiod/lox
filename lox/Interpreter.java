@@ -3,11 +3,13 @@ package lox;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Stack;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     final Environment globals = new Environment();
     private Environment environment = globals;
-    static boolean shouldBreak, shouldContinue;
+    boolean shouldBreak, shouldContinue, shouldReturn;
+    Object ret;
 
     Interpreter() {
         globals.define("time", new LoxCallable() {
@@ -29,6 +31,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         try {
             this.shouldBreak = false;
             this.shouldContinue = false;
+            this.shouldReturn = false;
             for (Stmt statement : statements) {
                 execute(statement);
             }
@@ -79,7 +82,17 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     @Override
     public Void visitJumpStmt(Stmt.Jump stmt) {
         if (stmt.jump.type == TokenType.BREAK) this.shouldBreak = true;
-        if (stmt.jump.type == TokenType.CONTINUE) this.shouldContinue = true;
+        return null;
+    }
+
+    @Override
+    public Void visitReturnStmt(Stmt.Return stmt) {
+        //System.out.println("Visit return, value is " + stmt.value);
+        this.shouldReturn = true;
+        if (stmt.value == null) this.ret = null;
+        else{
+            this.ret = evaluate(stmt.value);
+        }
         return null;
     }
 
@@ -182,6 +195,8 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
                     fun.arity() + " arguments but got " +
                     args.size() + ".");
         }
+        //System.out.println("Visit Call " + fun);
+        this.shouldReturn = false;
         return fun.call(this, args);
     }
 
@@ -254,7 +269,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     private void execute(Stmt stmt) {
-        if (!this.shouldBreak && !this.shouldContinue) stmt.accept(this);
+        if (!this.shouldBreak && !this.shouldContinue && !this.shouldReturn) stmt.accept(this);
     }
 
     public void executeBlock(List<Stmt> statements, Environment env) {
@@ -263,7 +278,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
             this.environment = env;
             for (Stmt stmt : statements) {
 
-                if (this.shouldBreak || this.shouldContinue) break;
+                if (this.shouldBreak || this.shouldContinue || this.shouldReturn) break;
                 stmt.accept(this);
             }
         } finally {

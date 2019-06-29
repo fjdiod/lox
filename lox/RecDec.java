@@ -11,7 +11,8 @@ import static lox.TokenType.*;
 program        → declaration* EOF;
 declaration    → funDec | varDecl | statement;
 varDecl        → "var" IDENTIFIER ( "=" expression | "=" "fun" block)? ";";
-statement      → exprStatement | printStatemt | block | ifStatement | whileStatement | jumpStatement;
+statement      → exprStatement | printStatemt | block | ifStatement | whileStatement | jumpStatement | returnStmt;
+returnStmt     → "return" expression? ";";
 jumpStatement  → "break" | "continue";
 whileStatement → "while" "(" expression ")" statement ;
 ifStatement    → "if" "(" expression ")" statement ("elif" "(" expression ")" statement)* ("else" statement)? ;
@@ -47,7 +48,8 @@ class Parser {
     private static class ParseError extends RuntimeException {}
     private final List<Token> tokens;
     private int current = 0;
-    boolean isInloop = false;
+    int isInloop = 0;
+    int isInFun = 0;
 
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
@@ -90,8 +92,9 @@ class Parser {
         }
         consume(RIGHT_PAREN, "')' expected after 'fun'");
         consume(LEFT_BRACE, "'{' expected after 'fun'");
+        this.isInFun += 1;
         List<Stmt> body = block();
-        consume(SEMICOLON, "expected ';' after declaration of function");
+        this.isInFun -= 1;
         return new Stmt.Function(name, args, body);
     }
 
@@ -109,8 +112,10 @@ class Parser {
                 }
                 consume(RIGHT_PAREN, "')' expected after 'fun'");
                 consume(LEFT_BRACE, "'{' expected after 'fun'");
+                this.isInFun += 1;
                 List<Stmt> body = block();
-                consume(SEMICOLON, "expected ';' after declaration of function");
+                this.isInFun -= 1;
+                consume(SEMICOLON, "expected ';' after declaration of anonymous function");
                 return new Stmt.Function(name, args, body);
             }
             initializer = expression();
@@ -121,9 +126,9 @@ class Parser {
 
     private Stmt statement() {
         if (match(FOR)) {
-            this.isInloop = true;
+            this.isInloop += 1;
             Stmt res = forStatement();
-            this.isInloop = false;
+            this.isInloop -= 1;
             return res;
         }
         if (match(PRINT)) {
@@ -133,17 +138,21 @@ class Parser {
             return ifStatement();
         }
         if (match(WHILE)) {
-            this.isInloop = true;
+            this.isInloop += 1;
             Stmt res = whileStatement();
-            this.isInloop = false;
+            this.isInloop -= 1;
             return res;
         }
         if (match(BREAK, CONTINUE)) {
-            if (!this.isInloop) throw error(previous(), "'break' without loop");
+            if (this.isInloop == 0) throw error(previous(), "'break' without loop");
             //System.out.println(parent);
             Stmt.Jump jump = new Stmt.Jump(previous());
             consume(SEMICOLON, "expected ';'");
             return jump;
+        }
+        if (match(RETURN)) {
+            if (this.isInFun == 0) throw error(previous(), "'return' out of function body");
+            return returnStatement();
         }
         if (match(LEFT_BRACE)) {
             return new Stmt.Block(block());
@@ -152,6 +161,15 @@ class Parser {
         //consume(SEMICOLON, "Expect ';' after stetements.");
     }
 
+    private Stmt returnStatement() {
+        Token keyword = previous();
+        Expr value = null;
+        if(!check(SEMICOLON)) {
+            value = expression();
+        }
+        consume(SEMICOLON, "expected ';' after 'return'");
+        return new Stmt.Return(keyword, value);
+    }
 
     private Stmt forStatement() {
         consume(LEFT_PAREN, "Expect '(' after 'while'.");

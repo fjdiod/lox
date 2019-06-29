@@ -13,6 +13,7 @@ R visitExpressionStmt(Expression stmt);
 R visitBlockStmt(Block stmt);
 R visitIfStmt(If stmt);
 R visitFunctionStmt(Function stmt);
+R visitReturnStmt(Return stmt);
 }
 
 Stmt parent;
@@ -33,6 +34,23 @@ Stmt parent;
 
 
 }
+
+    static class Return extends Stmt {
+        Return(Token keyword, Expr value) {
+            this.keyword = keyword;
+            this.value = value;
+
+        }
+
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitReturnStmt(this);
+        }
+
+        Token keyword;
+        Expr value;
+
+
+    }
 
 static class Var extends Stmt {
 Var(Token name, Expr initializer) {
