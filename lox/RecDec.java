@@ -10,6 +10,8 @@ import static lox.TokenType.*;
 /*
 program        → declaration* EOF;
 declaration    → funDec | varDecl | statement;
+funDec         → fun IDENTIFIER funExpr ;
+funExpr        →
 varDecl        → "var" IDENTIFIER ( "=" expression | "=" "fun" block)? ";";
 statement      → exprStatement | printStatemt | block | ifStatement | whileStatement | jumpStatement | returnStmt;
 returnStmt     → "return" expression? ";";
@@ -34,7 +36,8 @@ call           → primary ( "(" arguments ? ")")* ;
 arguments      → expression ( "," expression )* ;
 | primary ;
 primary        → NUMBER | STRING | "false" | "true" | "nil"
-| "(" expression ")" | IDENTIFIER ;
+function       → "fun" "(" (IDENTIFIER ",")* ")" block;
+| "(" expression ")" | IDENTIFIER | function;
 
 1 > 2 ? 0 : 1
 1 > 2 ? 1 ? -1 : 0
@@ -68,8 +71,10 @@ class Parser {
 
     private Stmt declaration() {
         try {
-            if (match(FUN)) {
-                return funDec("function");
+            if (check(FUN) && checkNext(IDENTIFIER)) {
+                consume(FUN, null);
+                //Token name = consume(IDENTIFIER, "Expect name.");
+                return function("function");
             }
             if (match(VAR)) {
                 return varDecl();
@@ -81,8 +86,13 @@ class Parser {
         }
     }
 
-    private Stmt funDec(String kind) {
+    private Stmt function(String kind) {
         Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+        //consume(LEFT_PAREN, "'(' expected after 'fun'");
+        return new Stmt.Function(name, functionBody("function"));
+    }
+
+    private Expr.Function functionBody(String kind) {
         consume(LEFT_PAREN, "'(' expected after 'fun'");
         List<Token> args = new ArrayList<>();
         if (!check(RIGHT_PAREN)) {
@@ -95,29 +105,14 @@ class Parser {
         this.isInFun += 1;
         List<Stmt> body = block();
         this.isInFun -= 1;
-        return new Stmt.Function(name, args, body);
+        //consume(SEMICOLON, "expected ';' after declaration of anonymous function");
+        return new Expr.Function(args, body);
     }
 
     private Stmt varDecl() {
         Token name = consume(IDENTIFIER, "Expect variable name.");
         Expr initializer = null;
         if (match(EQUAL)) {
-            if (match(FUN)) {
-                consume(LEFT_PAREN, "'(' expected after 'fun'");
-                List<Token> args = new ArrayList<>();
-                if (!check(RIGHT_PAREN)) {
-                    do {
-                        args.add(consume(IDENTIFIER, "excpected identifier"));
-                    } while(match(COMMA));
-                }
-                consume(RIGHT_PAREN, "')' expected after 'fun'");
-                consume(LEFT_BRACE, "'{' expected after 'fun'");
-                this.isInFun += 1;
-                List<Stmt> body = block();
-                this.isInFun -= 1;
-                consume(SEMICOLON, "expected ';' after declaration of anonymous function");
-                return new Stmt.Function(name, args, body);
-            }
             initializer = expression();
         }
         consume(SEMICOLON, "Expect ;.");
@@ -419,6 +414,9 @@ class Parser {
             consume(RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
         }
+        if (match(FUN)) {
+            return functionBody("function");
+        }
         throw error(peek(), "Expect expression.");
     }
 
@@ -441,6 +439,12 @@ class Parser {
     private boolean check(TokenType type) {
         if (isAtEnd()) return false;
         return peek().type == type;
+    }
+
+    private boolean checkNext(TokenType type) {
+        if (isAtEnd()) return false;
+        if (tokens.get(current + 1) .type== EOF) return false;
+        return tokens.get(current + 1).type == type;
     }
 
     private Token advance() {

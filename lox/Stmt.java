@@ -108,10 +108,9 @@ Stmt parent;
 }
 
     static class Function extends Stmt {
-        Function(Token name, List<Token> args, List<Stmt> body) {
+        Function(Token name, Expr.Function function) {
             this.name = name;
-            this.args = args;
-            this.body = body;
+            this.function = function;
 
         }
 
@@ -120,8 +119,7 @@ Stmt parent;
         }
 
         Token name;
-        List<Token> args;
-        List<Stmt> body;
+        Expr.Function function;
     }
 
 static class Expression extends Stmt {
