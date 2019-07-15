@@ -159,7 +159,7 @@ class Scanner {
 
     private char peekNext() {
         if (current + 1 >= source.length()) return '\0';
-        return source.charAt(current);
+        return source.charAt(current + 1);
     }
 
     private boolean match(char expected) {

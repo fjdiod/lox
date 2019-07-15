@@ -1,4 +1,4 @@
-all: lox scanner interpreter expr stmt parser env token token_type callable function
+all: lox scanner interpreter expr stmt parser env token token_type callable function resolver.class
 
 lox: lox/Lox.java
 	javac lox/Lox.java
@@ -32,3 +32,6 @@ callable: lox/LoxCallable.java
 
 function: lox/LoxFunction.java
 	javac lox/LoxFunction.java
+
+resolver.class: lox/Resolver.java
+	javac lox/Resolver.java
